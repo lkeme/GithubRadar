@@ -1,0 +1,566 @@
+/*
+ * 三层设计 Token：
+ * 1. 原始值（primitive）：调色板与字号等裸值，只在本文件出现。
+ * 2. 语义值（semantic）：--gr-* 语义变量，明暗主题在此翻转。
+ * 3. 组件值：通过 Tailwind @theme 映射语义 token，组件内只使用工具类，不散落硬编码颜色。
+ * 浅色基线 #F8FAFC/#FFFFFF/#0F172A/#475569/#1D4ED8，深色 #0B1120/#111827/#F1F5F9/#94A3B8/#93C5FD。
+ *
+ * 视觉语言「精密仪表台」：开发者监控台的仪器质感——
+ * - 字体双声部：sans 承载叙述，mono 承载一切数据（版本/数值/时间）；
+ * - 标签层（overline）：12px/600/+0.05em 的小型标签为数据格命名；
+ * - 表面分层：页面网格底纹 → 卡片 → 卡内数据区（低饱和内衬）；
+ * - 动效包络不变：仅 transform/opacity（色相跟随既有基线），120–220ms，reduced-motion 全静止。
+ */
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  /* ---- primitive ---- */
+  --gr-slate-50: #f8fafc;
+  --gr-slate-100: #f1f5f9;
+  --gr-slate-200: #e2e8f0;
+  --gr-slate-300: #cbd5e1;
+  --gr-slate-600: #475569;
+  --gr-slate-900: #0f172a;
+  --gr-white: #ffffff;
+  --gr-blue-100: #dbeafe;
+  --gr-blue-600: #2563eb;
+  --gr-blue-700: #1d4ed8;
+  --gr-blue-800: #1e40af;
+  --gr-green-100: #dcfce7;
+  --gr-green-700: #15803d;
+  --gr-amber-100: #fef3c7;
+  --gr-amber-700: #b45309;
+  --gr-red-100: #fee2e2;
+  --gr-red-700: #b91c1c;
+
+  --gr-navy-950: #0b1120;
+  --gr-gray-900: #111827;
+  --gr-slate-800: #1e293b;
+  --gr-slate-400: #94a3b8;
+  --gr-blue-300: #93c5fd;
+  --gr-blue-200: #bfdbfe;
+  --gr-blue-900: #1e3a8a;
+  --gr-green-300: #86efac;
+  --gr-green-950: #14321c;
+  --gr-amber-300: #fcd34d;
+  --gr-amber-950: #3a2e12;
+  --gr-red-300: #fca5a5;
+  --gr-red-950: #3f1d1d;
+
+  /* ---- semantic（浅色） ---- */
+  --gr-bg: var(--gr-slate-50);
+  --gr-surface: var(--gr-white);
+  --gr-surface-2: var(--gr-slate-100);
+  /* 内衬数据区：比 surface-2 更安静的一档，用于卡片内的数据格。 */
+  --gr-inset: #f8fafc;
+  --gr-text: var(--gr-slate-900);
+  --gr-muted: var(--gr-slate-600);
+  --gr-border: var(--gr-slate-200);
+  --gr-border-strong: var(--gr-slate-300);
+  --gr-accent: var(--gr-blue-700);
+  --gr-accent-strong: var(--gr-blue-800);
+  --gr-accent-subtle: var(--gr-blue-100);
+  --gr-accent-contrast: var(--gr-white);
+  --gr-success: var(--gr-green-700);
+  --gr-success-subtle: var(--gr-green-100);
+  --gr-warning: var(--gr-amber-700);
+  --gr-warning-subtle: var(--gr-amber-100);
+  --gr-danger: var(--gr-red-700);
+  --gr-danger-subtle: var(--gr-red-100);
+  /* 深色下 danger 是浅红（红 300），白字只有约 1.9:1，必须改用深底反色。 */
+  --gr-danger-contrast: var(--gr-white);
+  --gr-ring: var(--gr-blue-700);
+  --gr-scrim: rgb(15 23 42 / 0.45);
+  /* 页面网格底纹：静态、极淡的“坐标纸”，呼应雷达台而不做持续动画。 */
+  --gr-grid-line: rgb(15 23 42 / 0.028);
+
+  /* 高程：静态阴影保持极轻；浮起阴影只经 opacity 淡入（仅 transform/opacity）。 */
+  --gr-elev-card:
+    0 1px 1px rgb(15 23 42 / 0.04),
+    0 1px 2px rgb(15 23 42 / 0.05);
+  --gr-elev-lift:
+    0 12px 28px -12px rgb(15 23 42 / 0.2),
+    0 2px 6px -2px rgb(15 23 42 / 0.07);
+  --gr-elev-pop:
+    0 24px 56px -16px rgb(15 23 42 / 0.26),
+    0 6px 14px -6px rgb(15 23 42 / 0.1);
+
+  /* 统一缓动：进入用 expo-out（快起缓收），hover/focus 120–180ms、面板 180–220ms。 */
+  --gr-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --gr-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+   * 底部悬浮命令条的高度占位：批量操作条挂载时由组件实测写入，
+   * 提示层据此整体上移——否则两者叠在同一个角落，提示会挡住命令条按钮。
+   */
+  --gr-toast-offset: 0px;
+}
+
+/* 系统深色且用户未显式选择浅色时，使用深色语义值。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --gr-bg: var(--gr-navy-950);
+    --gr-surface: var(--gr-gray-900);
+    --gr-surface-2: var(--gr-slate-800);
+    --gr-inset: #151d2c;
+    --gr-text: #f1f5f9;
+    --gr-muted: var(--gr-slate-400);
+    --gr-border: #2a3648;
+    --gr-border-strong: var(--gr-slate-600);
+    --gr-accent: var(--gr-blue-300);
+    --gr-accent-strong: var(--gr-blue-200);
+    --gr-accent-subtle: var(--gr-blue-900);
+    --gr-accent-contrast: var(--gr-navy-950);
+    --gr-success: var(--gr-green-300);
+    --gr-success-subtle: var(--gr-green-950);
+    --gr-warning: var(--gr-amber-300);
+    --gr-warning-subtle: var(--gr-amber-950);
+    --gr-danger: var(--gr-red-300);
+    --gr-danger-subtle: var(--gr-red-950);
+    --gr-danger-contrast: var(--gr-navy-950);
+    --gr-ring: var(--gr-blue-300);
+    --gr-scrim: rgb(2 6 23 / 0.62);
+    --gr-grid-line: rgb(148 163 184 / 0.05);
+
+    --gr-elev-card: 0 1px 2px rgb(2 6 23 / 0.4);
+    --gr-elev-lift:
+      0 12px 28px -12px rgb(2 6 23 / 0.65),
+      0 2px 6px -2px rgb(2 6 23 / 0.45);
+    --gr-elev-pop:
+      0 24px 56px -16px rgb(2 6 23 / 0.75),
+      0 6px 14px -6px rgb(2 6 23 / 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  --gr-bg: var(--gr-navy-950);
+  --gr-surface: var(--gr-gray-900);
+  --gr-surface-2: var(--gr-slate-800);
+  --gr-inset: #151d2c;
+  --gr-text: #f1f5f9;
+  --gr-muted: var(--gr-slate-400);
+  --gr-border: #2a3648;
+  --gr-border-strong: var(--gr-slate-600);
+  --gr-accent: var(--gr-blue-300);
+  --gr-accent-strong: var(--gr-blue-200);
+  --gr-accent-subtle: var(--gr-blue-900);
+  --gr-accent-contrast: var(--gr-navy-950);
+  --gr-success: var(--gr-green-300);
+  --gr-success-subtle: var(--gr-green-950);
+  --gr-warning: var(--gr-amber-300);
+  --gr-warning-subtle: var(--gr-amber-950);
+  --gr-danger: var(--gr-red-300);
+  --gr-danger-subtle: var(--gr-red-950);
+  --gr-danger-contrast: var(--gr-navy-950);
+  --gr-ring: var(--gr-blue-300);
+  --gr-scrim: rgb(2 6 23 / 0.62);
+  --gr-grid-line: rgb(148 163 184 / 0.05);
+
+  --gr-elev-card: 0 1px 2px rgb(2 6 23 / 0.4);
+  --gr-elev-lift:
+    0 12px 28px -12px rgb(2 6 23 / 0.65),
+    0 2px 6px -2px rgb(2 6 23 / 0.45);
+  --gr-elev-pop:
+    0 24px 56px -16px rgb(2 6 23 / 0.75),
+    0 6px 14px -6px rgb(2 6 23 / 0.55);
+}
+
+@theme inline {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, 'Cascadia Mono', Consolas, 'Liberation Mono', Menlo,
+    monospace;
+
+  --color-bg: var(--gr-bg);
+  --color-surface: var(--gr-surface);
+  --color-surface-2: var(--gr-surface-2);
+  --color-inset: var(--gr-inset);
+  --color-text: var(--gr-text);
+  --color-muted: var(--gr-muted);
+  --color-border: var(--gr-border);
+  --color-border-strong: var(--gr-border-strong);
+  --color-accent: var(--gr-accent);
+  --color-accent-strong: var(--gr-accent-strong);
+  --color-accent-subtle: var(--gr-accent-subtle);
+  --color-accent-contrast: var(--gr-accent-contrast);
+  --color-success: var(--gr-success);
+  --color-success-subtle: var(--gr-success-subtle);
+  --color-warning: var(--gr-warning);
+  --color-warning-subtle: var(--gr-warning-subtle);
+  --color-danger: var(--gr-danger);
+  --color-danger-subtle: var(--gr-danger-subtle);
+  --color-danger-contrast: var(--gr-danger-contrast);
+  --color-ring: var(--gr-ring);
+  --color-scrim: var(--gr-scrim);
+
+  --shadow-card: var(--gr-elev-card);
+  --shadow-lift: var(--gr-elev-lift);
+  --shadow-pop: var(--gr-elev-pop);
+
+  --ease-gr: var(--gr-ease);
+  --ease-gr-out: var(--gr-ease-out);
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+
+  /* 字阶：正文16/辅助14/辅助13/仓库名16/页标题28；label 为数据格的微型标签层。 */
+  --text-display: 28px;
+  --text-display--line-height: 1.2;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 650;
+  --text-title: 24px;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.015em;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-aux: 13px;
+  --text-aux--line-height: 1.45;
+  --text-aux2: 14px;
+  --text-aux2--line-height: 1.5;
+  --text-label: 12px;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.05em;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    scroll-padding-top: 6.5rem;
+    /* 底部粘性操作栏不遮挡聚焦元素。 */
+    scroll-padding-bottom: 5.5rem;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme='light']) {
+      color-scheme: dark;
+    }
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--gr-bg);
+    color: var(--gr-text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 坐标纸底纹：固定视口、极淡、静态；header 之下自然衬出网格（清晰网格）。 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--gr-grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--gr-grid-line) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--gr-border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gr-ring);
+    outline-offset: 2px;
+  }
+
+  /* 指针上下文（pointerdown 后、下一次 keydown 前）不画焦点环：
+     菜单/下拉关闭后的脚本回焦对鼠标用户是视觉残留；键盘路径标记已被 keydown 清除。 */
+  :root[data-focus-source='pointer'] :focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--gr-accent-subtle);
+    color: var(--gr-text);
+  }
+
+  /* 细滚动条与主题一致，长列表（导入结果、任务页）不出现系统默认粗条。 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gr-border-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 8px;
+    background-color: var(--gr-border-strong);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* 面板与卡片：圆角控件 8px、卡片 12px，静态阴影极轻且统一。 */
+  .gr-card {
+    border-radius: var(--radius-card);
+    border: 1px solid var(--gr-border);
+    background-color: var(--gr-surface);
+    box-shadow: var(--gr-elev-card);
+  }
+
+  /*
+   * 悬停浮起：位移走 transform，加深阴影用 ::after 叠层只淡入 opacity，
+   * 两种通道都落在允许的 transform/opacity 内。
+   */
+  .gr-lift {
+    position: relative;
+    transition: transform 160ms var(--gr-ease-out);
+  }
+
+  .gr-lift::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: var(--gr-elev-lift);
+    opacity: 0;
+    transition: opacity 160ms var(--gr-ease-out);
+    pointer-events: none;
+  }
+
+  .gr-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  .gr-lift:hover::after {
+    opacity: 1;
+  }
+
+  .gr-input {
+    border-radius: var(--radius-control);
+    border: 1px solid var(--gr-border-strong);
+    background-color: var(--gr-surface);
+    color: var(--gr-text);
+    padding: 0.5rem 0.75rem;
+    font-size: 14px;
+    width: 100%;
+    transition:
+      border-color 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+
+  .gr-input::placeholder {
+    color: var(--gr-muted);
+    opacity: 0.8;
+  }
+
+  /* 聚焦反馈 = 描边变色 + accent 晕环；outline 交由晕环表达，避免双圈。 */
+  .gr-input:focus,
+  .gr-input:focus-visible {
+    border-color: var(--gr-accent);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--gr-accent) 22%, transparent);
+  }
+
+  .gr-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .gr-input[aria-invalid='true'] {
+    border-color: var(--gr-danger);
+  }
+
+  .gr-input[aria-invalid='true']:focus,
+  .gr-input[aria-invalid='true']:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--gr-danger) 22%, transparent);
+  }
+
+  /* Radix 浮层动画只使用 transform/opacity。 */
+  .gr-popover {
+    z-index: 60;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--gr-border);
+    background-color: var(--gr-surface);
+    box-shadow: var(--gr-elev-pop);
+  }
+
+  /* 数据格标签（overline）：微型标签层为数据命名，是“仪表读数”的刻度。 */
+  .gr-label {
+    font-size: var(--text-label);
+    line-height: var(--text-label--line-height);
+    letter-spacing: var(--text-label--letter-spacing);
+    font-weight: 600;
+    color: var(--gr-muted);
+  }
+
+  /* 图标/品牌底衬：小面积 accent 提示，用于章节头、空态与品牌标。 */
+  .gr-icon-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: var(--radius-control);
+    background-color: var(--gr-accent-subtle);
+    color: var(--gr-accent);
+  }
+
+  /* 品牌标：accent 双色微渐变 + 高光内衬，静态。 */
+  .gr-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background-image: linear-gradient(135deg, color-mix(in srgb, var(--gr-accent) 92%, #ffffff 8%), var(--gr-accent-strong));
+    color: var(--gr-accent-contrast);
+    box-shadow:
+      var(--gr-elev-card),
+      inset 0 1px 0 rgb(255 255 255 / 0.18);
+  }
+
+  /* 状态 pill：图标 + 文字 + 颜色三重表达的小面积状态。 */
+  .gr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    padding: 0.125rem 0.55rem;
+    font-size: var(--text-aux);
+    line-height: 1.45;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* 卡片左缘的更新标记：accent 竖条 + 卡脚状态行，替代大面积色块。 */
+  .gr-edge {
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 999px 999px 0;
+    background-image: linear-gradient(to bottom, var(--gr-accent), color-mix(in srgb, var(--gr-accent) 55%, transparent));
+  }
+
+  /* 骨架屏：opacity 呼吸，reduced-motion 下由全局规则静止。 */
+  .gr-skeleton {
+    border-radius: var(--radius-control);
+    background-color: var(--gr-surface-2);
+    animation: gr-shimmer 1.6s var(--gr-ease) infinite;
+  }
+
+  /*
+   * 一次性入场（非持续动画）：卡片/行挂载时 180ms 上浮淡入，可错峰。
+   * fill 用 backwards 而不是 both：动画结束后不持有末帧 transform，
+   * 否则 .gr-lift 的 hover 位移会被动画填充永久覆盖。
+   */
+  .gr-rise {
+    animation: gr-rise 180ms var(--gr-ease-out) backwards;
+    animation-delay: var(--gr-rise-delay, 0ms);
+  }
+
+  @keyframes gr-rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes gr-shimmer {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  @keyframes gr-overlay-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes gr-content-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes gr-drawer-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0.6;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes gr-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .gr-anim-overlay[data-state='open'] {
+    animation: gr-overlay-in 140ms ease-out;
+  }
+
+  .gr-anim-content[data-state='open'] {
+    animation: gr-content-in 180ms var(--gr-ease-out);
+  }
+
+  .gr-anim-drawer[data-state='open'] {
+    animation: gr-drawer-in 200ms var(--gr-ease-out);
+  }
+
+  .gr-anim-toast[data-state='open'] {
+    animation: gr-toast-in 150ms var(--gr-ease-out);
+  }
+}

@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+  - apps/*
+  - tests
+# 不设冷却期：解析与安装始终取 registry 当时的最新版本，可复现性由 lockfile 承担。
+minimumReleaseAge: 0

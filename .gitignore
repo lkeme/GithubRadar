@@ -1,0 +1,27 @@
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# 运行时数据
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# 本地参考资料，不入库
+docs/
+
+# 环境变量与日志
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+
+# 端到端运行的临时数据库与测试报告
+.e2e-data/
+test-results/
+playwright-report/

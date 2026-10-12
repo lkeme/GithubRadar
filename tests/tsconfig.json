@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    // e2e 用例在 page.evaluate 回调里访问 window / document，需要 DOM 全局声明。
+    "lib": ["ES2024", "DOM"]
+  },
+  "include": ["unit/**/*.ts", "integration/**/*.ts", "vitest.config.ts", "playwright.config.ts", "e2e/**/*.ts"]
+}

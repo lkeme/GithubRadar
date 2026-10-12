@@ -1,0 +1,4 @@
+id,name,description,url,stars,forks,language,topics,created_at,first_seen,is_active,domains
+100001,alpha/agent-lab,Agent lab for prototyping,"https://github.com/alpha/agent-lab",120,15,Python,"agent,llm,automation",2025-01-02T03:04:05Z,2025-01-03,True,"AI,Agent"
+100002,beta/toolkit,"Toolkit with a comma, and more",https://github.com/beta/toolkit,45,6,TypeScript,"tools,agent",2025-02-01T00:00:00Z,2025-02-02,True,AI
+100003,gamma/zh-project,"中文描述，含逗号与引号""示例""",https://github.com/gamma/zh-project,7,1,,,2025-03-01T00:00:00Z,2025-03-02,False,Agent

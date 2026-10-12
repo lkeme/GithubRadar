@@ -1,0 +1,27 @@
+# 依赖与构建产物
+node_modules/
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+coverage/
+
+# 版本控制与文档
+.git/
+docs/
+
+# 测试内容
+tests/*
+!tests/package.json
+
+# 运行时数据
+data/
+.e2e-data/
+*.sqlite*
+.env
+.env.*
+
+# 日志与其他
+*.log
+logs/
+.DS_Store
+Thumbs.db

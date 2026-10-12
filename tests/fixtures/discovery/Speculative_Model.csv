@@ -1,0 +1,2 @@
+id,name,description,url,stars,forks,language,topics,created_at,first_seen,is_active,domains
+100007,eta/spec-decode,Speculative decoding playground,https://github.com/eta/spec-decode,200,30,Rust,speculative-decoding,2025-07-01T00:00:00Z,2025-07-02,True,Speculative Model
