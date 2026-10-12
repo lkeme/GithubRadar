@@ -1,0 +1,136 @@
+# GHCR 镜像构建：master 分支代码变更时构建 Dockerfile，并把镜像推到 ghcr.io。
+#
+# 保留策略（只留最新）：
+#   - 镜像包：只推 latest 单一标签，每次构建后删除上一轮的版本，只保留最近一轮；
+#   - 运行记录：每次构建后删除本工作流的历史运行，只保留当前这次。
+# 触发范围：推送到 master 即构建；同一分支的新推送取消旧运行。
+# 不写 paths-ignore：本仓库历史为单条初始提交、改动一律 amend 后强推，改写历史的推送
+# 没有公共祖先、算不出变更文件清单，路径过滤会被整体跳过（等于永不构建），故弃用。
+
+name: GHCR 镜像构建
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# 同一分支同时只跑一次；新推送取消旧运行，避免并发推送把 latest 指向旧提交。
+concurrency:
+  group: ghcr-${{ github.ref }}
+  cancel-in-progress: true
+
+# 仓库 Actions 工作流权限若被改成只读，需在仓库设置里放开，否则推送与清理都会 403。
+permissions:
+  contents: read    # 只用于检出源码
+  packages: write   # 推送镜像 + 删除旧镜像版本
+  actions: write    # 删除历史运行记录 + buildx 写入 Actions 缓存
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 挂死的构建会一直占着 concurrency 组并留下未结束的运行记录；多架构（含 arm64）构建
+    # 需要 QEMU 模拟，冷缓存耗时更长，故放宽到 45 分钟。
+    timeout-minutes: 45
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      # 推镜像前必须先过质量门禁：本工作流只保留最新镜像，坏提交推上去会顶掉唯一可用版本。
+      # pnpm 安装方式与 Dockerfile 一致；根 test 内部（tests 包）会先构建，
+      # 因此门禁跑的是当前源码的构建产物，不会出现「新源码 + 旧 dist」的假通过。
+      - name: 质量门禁：类型检查与测试
+        run: |
+          npm install --global --no-fund --no-audit pnpm@latest
+          pnpm install --frozen-lockfile
+          pnpm run typecheck && pnpm test
+
+      # GHCR 仓库名必须全小写；镜像名 ghcr.io/<owner>/<repo>，包名取末段。
+      - name: 计算镜像名
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "IMAGE_NAME=${REGISTRY}/${repo}" >> "$GITHUB_ENV"
+          echo "PACKAGE_NAME=${repo##*/}" >> "$GITHUB_ENV"
+
+      # better-sqlite3 自带 amd64/arm64 两套 prebuilds，多架构构建无需编译工具链；
+      # 不声明 platforms 只会产出 amd64，arm64 部署将退化为模拟执行。
+      - name: 准备 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 准备 Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 不生成 provenance/SBOM 证明：它们会在同一个包下额外产生版本条目，干扰下面
+      # “只保留最新版本”的清理（min-versions-to-keep: 1 可能只留下证明而不是镜像）。
+      # 只留一份镜像等于丢掉来源信息，用 OCI 标签把提交固化进镜像本身。
+      - name: 构建并推送
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 个人账号下的包常删不动（404 / Resource not accessible by integration），需要
+      # 自建 classic PAT（read:packages + delete:packages）存成 secret GHCR_TOKEN，
+      # 未配置时回退 GITHUB_TOKEN。用 GITHUB_TOKEN 推送的包会自动链接到本仓库；
+      # 手工推送过的同名包需在包的 Manage Actions access 里给本仓库授权。
+      # 该 action 单次最多处理 100 个版本；本流程每轮新增 3 个（见 min-versions-to-keep）。
+      # min-versions-to-keep 必须 ≥ 一轮的版本数：多架构推送在 GHCR 里是 index、amd64、
+      # arm64 各占一个包版本，只留 1 个会把两个平台清单当历史版本删掉，剩下的 index 变成
+      # 悬空引用 —— tag 能解析、拉平台清单 404（docker pull 报 manifests/<digest> not found）。
+      # 取 3 = 恰好一轮，每轮结束时上一轮的 3 个被清掉，latest 始终指向完整的一轮。
+      - name: 清理旧镜像版本（只留最近一轮）
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ env.PACKAGE_NAME }}
+          package-type: container
+          min-versions-to-keep: 3
+          token: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # 构建失败时也执行：失败记录保留到下次构建，便于定位；成功则本工作流只剩当前运行。
+      - name: 清理历史运行记录（只留本次）
+        if: always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const workflowId = (process.env.GITHUB_WORKFLOW_REF || '').split('@')[0].split('/').pop();
+            if (!workflowId) {
+              core.warning('无法从 GITHUB_WORKFLOW_REF 解析工作流文件名，跳过运行记录清理');
+              return;
+            }
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner, repo, workflow_id: workflowId, per_page: 100,
+            });
+            let deleted = 0;
+            for (const run of runs) {
+              // 跳过的三类：本次运行；run_number 更大的运行（别的分支刚跑完的更新记录，
+              // 删掉它只会让更旧的这次留下来，交给它自己收尾）；尚未结束的运行（删不掉）。
+              if (run.id === context.runId || run.run_number > context.runNumber) continue;
+              if (run.status !== 'completed') continue;
+              try {
+                await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: run.id });
+                deleted += 1;
+              } catch (error) {
+                core.warning(`运行记录 ${run.id} 删除失败：${error.message}`);
+              }
+            }
+            core.info(`已删除 ${deleted} 条历史运行记录，保留本次运行 ${context.runId}`);

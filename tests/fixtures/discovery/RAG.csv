@@ -1,0 +1,3 @@
+id,name,description,url,stars,forks,language,topics,created_at,first_seen,is_active,domains
+100001,alpha/agent-lab,Agent lab with retrieval,"https://github.com/alpha/agent-lab",999,999,Python,"rag",2025-01-02T03:04:05Z,2025-01-03,True,"RAG"
+100004,delta/rag-index,RAG index service,https://github.com/delta/rag-index,60,4,Go,"rag,search",2025-04-01T00:00:00Z,2025-04-02,True,RAG

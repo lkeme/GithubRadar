@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Github雷达">
+  <!-- 品牌标：与顶栏 .gr-brand 同一套 accent 双色渐变 + 白色雷达图形，静态无动画。 -->
+  <defs>
+    <linearGradient id="gr-tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f5cdb" />
+      <stop offset="1" stop-color="#1e40af" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#gr-tile)" />
+  <!-- 半径 21 的圆环在圆角矩形内不掉角；线宽 4 缩到 16px 仍有可辨的 1px 笔画。 -->
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round">
+    <circle cx="32" cy="32" r="21" stroke-opacity="0.42" />
+    <circle cx="32" cy="32" r="12" />
+    <path d="M32 32 L41.9 13.5" />
+  </g>
+</svg>

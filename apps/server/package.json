@@ -1,0 +1,42 @@
+{
+  "name": "@githubradar/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "reset-password": "node dist/cli/reset-password.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/static": "^10.1.6",
+    "@githubradar/contracts": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "csv-parse": "^7.0.3",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.7",
+    "https-proxy-agent": "^9.1.0",
+    "socks-proxy-agent": "^10.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}
